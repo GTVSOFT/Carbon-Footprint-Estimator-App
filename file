@@ -1,0 +1,77 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
+
+# ---------------------
+# 1. Generate Synthetic Data
+# ---------------------
+np.random.seed(42)
+n_samples = 200
+
+data = pd.DataFrame({
+    'monthly_energy_kwh': np.random.randint(100, 800, n_samples),  # electricity usage
+    'weekly_km_driven': np.random.randint(0, 500, n_samples),       # car travel
+    'flights_per_year': np.random.randint(0, 10, n_samples),        # air travel
+    'diet_type': np.random.choice(['Vegan', 'Vegetarian', 'Omnivore'], n_samples),  # food impact
+    'monthly_waste_kg': np.random.randint(5, 60, n_samples)         # waste
+})
+
+# Assign numeric impact for diet
+diet_map = {'Vegan': 0.8, 'Vegetarian': 1.2, 'Omnivore': 2.0}
+data['diet_factor'] = data['diet_type'].map(diet_map)
+
+# Carbon footprint formula (synthetic logic)
+data['carbon_footprint'] = (
+    data['monthly_energy_kwh'] * 0.4 +
+    data['weekly_km_driven'] * 0.21 * 4 +
+    data['flights_per_year'] * 250 +
+    data['monthly_waste_kg'] * 2 +
+    data['diet_factor'] * 100
+) + np.random.normal(0, 50, n_samples)  # add noise
+
+# ---------------------
+# 2. Train Model
+# ---------------------
+X = data[['monthly_energy_kwh', 'weekly_km_driven', 'flights_per_year', 'monthly_waste_kg', 'diet_factor']]
+y = data['carbon_footprint']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+preds = model.predict(X_test)
+mse = mean_squared_error(y_test, preds)
+
+# ---------------------
+# 3. Streamlit App UI
+# ---------------------
+st.set_page_config(page_title="Carbon Footprint Estimator", layout="centered")
+
+st.title("🌱 Carbon Footprint Estimator")
+st.write("Estimate your monthly carbon footprint based on lifestyle choices.")
+
+# User Inputs
+energy = st.slider("Monthly Energy Usage (kWh)", 50, 1000, 300)
+km_driven = st.slider("Weekly Kilometers Driven", 0, 1000, 100)
+flights = st.slider("Flights per Year", 0, 20, 2)
+waste = st.slider("Monthly Waste (kg)", 0, 100, 20)
+diet = st.selectbox("Diet Type", ["Vegan", "Vegetarian", "Omnivore"])
+
+# Prediction
+diet_val = diet_map[diet]
+user_data = np.array([[energy, km_driven, flights, waste, diet_val]])
+prediction = model.predict(user_data)[0]
+
+st.subheader("Estimated Monthly Carbon Footprint")
+st.metric(label="CO₂ Equivalent (kg)", value=f"{prediction:.2f}")
+
+st.write(f"Model Mean Squared Error: **{mse:.2f}**")
+
+# Show dataset preview
+with st.expander("See Synthetic Data Sample"):
+    st.write(data.head())
+
